@@ -1619,9 +1619,9 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1236b4b292f6c4d6dc34604bb5120d85c3fe1d1aa596bd5cc52ca054d13e7b9e"
+checksum = "3a6c9af12842a67734c9a2e355436e5d03b22383ed60cf13cd0c18fbfe3dcbcf"
 dependencies = [
  "async-trait",
  "axum-core 0.4.3",
@@ -1643,7 +1643,7 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
- "sync_wrapper 0.1.2",
+ "sync_wrapper 1.0.2",
  "tokio",
  "tower 0.4.13",
  "tower-layer",
@@ -1659,10 +1659,13 @@ checksum = "8b52af3cb4058c895d37317bb27508dccc8e5f2d39454016b297bf4a400597b8"
 dependencies = [
  "axum-core 0.5.6",
  "bytes",
+ "form_urlencoded",
  "futures-util",
  "http 1.4.0",
  "http-body 1.0.0",
  "http-body-util",
+ "hyper 1.6.0",
+ "hyper-util",
  "itoa",
  "matchit 0.8.4",
  "memchr",
@@ -1670,10 +1673,15 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "serde_core",
+ "serde_json",
+ "serde_path_to_error",
+ "serde_urlencoded",
  "sync_wrapper 1.0.2",
+ "tokio",
  "tower 0.5.2",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]
@@ -1713,6 +1721,7 @@ dependencies = [
  "sync_wrapper 1.0.2",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]
@@ -1735,7 +1744,7 @@ version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0be6ea09c9b96cb5076af0de2e383bd2bc0c18f827cf1967bdd353e0b910d733"
 dependencies = [
- "axum 0.7.4",
+ "axum 0.7.5",
  "axum-core 0.4.3",
  "bytes",
  "futures-util",
@@ -6531,7 +6540,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -8668,7 +8677,7 @@ name = "openai_embedding_service"
 version = "2.9.0-alpha"
 dependencies = [
  "async-openai",
- "axum 0.7.4",
+ "axum 0.8.8",
  "madsim-tokio",
  "serde",
  "serde_json",
@@ -8984,7 +8993,7 @@ name = "otlp-embedded"
 version = "0.0.1"
 source = "git+https://github.com/risingwavelabs/otlp-embedded?rev=e6cd165b9bc85783b42c106e99186b86b73e3507#e6cd165b9bc85783b42c106e99186b86b73e3507"
 dependencies = [
- "axum 0.7.4",
+ "axum 0.7.5",
  "datasize",
  "hex",
  "itertools 0.13.0",
@@ -11476,7 +11485,7 @@ name = "risingwave_common_service"
 version = "2.9.0-alpha"
 dependencies = [
  "async-trait",
- "axum 0.7.4",
+ "axum 0.8.8",
  "axum-extra",
  "futures",
  "http 1.4.0",
@@ -11968,7 +11977,7 @@ dependencies = [
  "async-trait",
  "auto_enums",
  "auto_impl",
- "axum 0.7.4",
+ "axum 0.8.8",
  "base64 0.22.1",
  "bk-tree",
  "bytes",
@@ -12222,7 +12231,7 @@ dependencies = [
  "assert_matches",
  "async-trait",
  "await-tree",
- "axum 0.7.4",
+ "axum 0.8.8",
  "base64-url",
  "bytes",
  "chrono",
@@ -12295,7 +12304,7 @@ name = "risingwave_meta_dashboard"
 version = "2.9.0-alpha"
 dependencies = [
  "anyhow",
- "axum 0.7.4",
+ "axum 0.8.8",
  "axum-embed",
  "bytes",
  "cargo-emit",
@@ -15575,7 +15584,7 @@ checksum = "877c5b330756d856ffcc4553ab34a5684481ade925ecc54bcd1bf02b1d0d4d52"
 dependencies = [
  "async-stream",
  "async-trait",
- "axum 0.7.4",
+ "axum 0.7.5",
  "base64 0.22.1",
  "bytes",
  "h2 0.4.12",
