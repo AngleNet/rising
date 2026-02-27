@@ -128,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Report final status
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const jobStatus = '${{ needs.release_pull_request.result }}';
