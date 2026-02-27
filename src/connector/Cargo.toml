@@ -68,6 +68,7 @@ clickhouse = { git = "https://github.com/risingwavelabs/clickhouse.rs", rev = "f
     "time",
     "rustls-tls",
 ], optional = true }
+croner = "2"
 csv = "1.4"
 deltalake = { workspace = true, optional = true }
 duration-str = "0.18.0"
@@ -96,6 +97,7 @@ itertools = { workspace = true }
 jni = { workspace = true }
 maplit = "1.0.2"
 moka = { version = "0.12.10", features = ["future"] }
+minijinja = "2"
 mongodb = "3.2.5"
 mysql_async = { workspace = true }
 mysql_common = { version = "0.35", default-features = false, features = [

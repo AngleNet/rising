@@ -1,0 +1,191 @@
+# End-to-end tests for the REST API fetcher source connector.
+#
+# Tests cover:
+#   1. Basic fetch — simple JSON array endpoint
+#   2. Nested data path — extract data from a nested JSON structure
+#   3. Field mappings — rename API response fields to column names
+#   4. Offset pagination — fetch all pages with offset/limit
+#   5. Cursor pagination — fetch all pages with cursor tokens
+
+# ---------- Start mock HTTP server ----------
+
+system ok
+python3 e2e_test/source_inline/fetcher/mock_server.py > /dev/null 2>&1 < /dev/null &
+
+sleep 1s
+
+system ok retry 5 backoff 1s
+curl --silent --fail-with-body http://localhost:18386/health
+
+# ==========================================================
+# Test 1: Basic fetch — simple JSON array
+# ==========================================================
+
+statement ok
+CREATE TABLE fetcher_basic (
+    id INT,
+    name VARCHAR,
+    score REAL
+) WITH (
+    connector = 'fetcher',
+    fetcher.url = 'http://localhost:18386/basic',
+    fetcher.poll.interval.seconds = '2'
+) FORMAT PLAIN ENCODE JSON;
+
+sleep 5s
+
+statement ok
+flush;
+
+query ITR retry 5 backoff 2s rowsort
+SELECT id, name, score FROM fetcher_basic;
+----
+1 Alice 95.5
+2 Bob 87
+3 Charlie 72.3
+
+statement ok
+DROP TABLE fetcher_basic;
+
+# ==========================================================
+# Test 2: Nested data path
+# ==========================================================
+
+statement ok
+CREATE TABLE fetcher_nested (
+    id INT,
+    value VARCHAR
+) WITH (
+    connector = 'fetcher',
+    fetcher.url = 'http://localhost:18386/nested',
+    fetcher.poll.interval.seconds = '2',
+    fetcher.response.data.path = '/data/items'
+) FORMAT PLAIN ENCODE JSON;
+
+sleep 5s
+
+statement ok
+flush;
+
+query IT retry 5 backoff 2s rowsort
+SELECT id, value FROM fetcher_nested;
+----
+10 hello
+20 world
+
+statement ok
+DROP TABLE fetcher_nested;
+
+# ==========================================================
+# Test 3: Field mappings — rename response fields to columns
+# ==========================================================
+
+statement ok
+CREATE TABLE fetcher_mapped (
+    id INT,
+    name VARCHAR,
+    signup_date VARCHAR
+) WITH (
+    connector = 'fetcher',
+    fetcher.url = 'http://localhost:18386/mapped',
+    fetcher.poll.interval.seconds = '2',
+    fetcher.field.mappings = '{"user_id": "id", "user_name": "name", "created_at": "signup_date"}'
+) FORMAT PLAIN ENCODE JSON;
+
+sleep 5s
+
+statement ok
+flush;
+
+query ITT retry 5 backoff 2s rowsort
+SELECT id, name, signup_date FROM fetcher_mapped;
+----
+100 Dana 2024-01-15
+200 Eve 2024-06-20
+
+statement ok
+DROP TABLE fetcher_mapped;
+
+# ==========================================================
+# Test 4: Offset pagination
+# ==========================================================
+
+statement ok
+CREATE TABLE fetcher_offset (
+    id INT,
+    val VARCHAR
+) WITH (
+    connector = 'fetcher',
+    fetcher.url = 'http://localhost:18386/paged_offset',
+    fetcher.poll.interval.seconds = '2',
+    fetcher.pagination.mode = 'offset',
+    fetcher.pagination.page.size = '3'
+) FORMAT PLAIN ENCODE JSON;
+
+sleep 8s
+
+statement ok
+flush;
+
+# Should have fetched all 10 items across 4 pages (3+3+3+1)
+query IT retry 5 backoff 2s rowsort
+SELECT id, val FROM fetcher_offset;
+----
+1 item_1
+10 item_10
+2 item_2
+3 item_3
+4 item_4
+5 item_5
+6 item_6
+7 item_7
+8 item_8
+9 item_9
+
+statement ok
+DROP TABLE fetcher_offset;
+
+# ==========================================================
+# Test 5: Cursor pagination
+# ==========================================================
+
+statement ok
+CREATE TABLE fetcher_cursor (
+    id INT,
+    val VARCHAR
+) WITH (
+    connector = 'fetcher',
+    fetcher.url = 'http://localhost:18386/paged_cursor',
+    fetcher.poll.interval.seconds = '2',
+    fetcher.response.data.path = '/results',
+    fetcher.pagination.mode = 'cursor',
+    fetcher.pagination.cursor.path = '/meta/next_cursor'
+) FORMAT PLAIN ENCODE JSON;
+
+sleep 8s
+
+statement ok
+flush;
+
+# Should have fetched all 10 items across 4 pages
+query IT retry 5 backoff 2s rowsort
+SELECT id, val FROM fetcher_cursor;
+----
+1 item_1
+10 item_10
+2 item_2
+3 item_3
+4 item_4
+5 item_5
+6 item_6
+7 item_7
+8 item_8
+9 item_9
+
+statement ok
+DROP TABLE fetcher_cursor;
+
+# ---------- Stop mock server ----------
+
+system ok
+pkill -f 'mock_server.py' || true

@@ -3057,6 +3057,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "croner"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c344b0690c1ad1c7176fe18eb173e0c927008fdaaa256e40dfd43ddd149c0843"
+dependencies = [
+ "chrono",
+]
+
+[[package]]
 name = "crossbeam"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7944,6 +7953,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "minijinja"
+version = "2.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c54f3bcc034dd74496b5ca929fd0b710186672d5ff0b0f255a9ceb259042ece"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11603,6 +11621,7 @@ dependencies = [
  "chrono-tz",
  "clickhouse",
  "criterion",
+ "croner",
  "csv",
  "deltalake",
  "duration-str",
@@ -11630,6 +11649,7 @@ dependencies = [
  "madsim-tokio",
  "madsim-tonic",
  "maplit",
+ "minijinja",
  "moka",
  "mongodb",
  "mysql_async",

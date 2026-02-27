@@ -15,6 +15,7 @@
 pub mod prelude {
     // import all split enumerators
     pub use crate::source::datagen::DatagenSplitEnumerator;
+    pub use crate::source::fetcher::FetcherSplitEnumerator;
     pub use crate::source::filesystem::LegacyS3SplitEnumerator;
     pub use crate::source::filesystem::opendal_source::OpendalEnumerator;
     pub use crate::source::google_pubsub::PubsubSplitEnumerator as GooglePubsubSplitEnumerator;
@@ -48,6 +49,7 @@ pub mod batch;
 pub mod cdc;
 pub mod data_gen_util;
 pub mod datagen;
+pub mod fetcher;
 pub mod filesystem;
 pub mod google_pubsub;
 pub mod kafka;
@@ -74,6 +76,7 @@ pub use nats::NATS_CONNECTOR;
 use utils::feature_gated_source_mod;
 
 pub use self::adbc_snowflake::ADBC_SNOWFLAKE_CONNECTOR;
+pub use self::fetcher::FETCHER_CONNECTOR;
 mod common;
 pub mod iceberg;
 mod manager;
