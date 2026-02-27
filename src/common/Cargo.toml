@@ -53,7 +53,7 @@ humantime = "2.3"
 ipnet = "2.9"
 itertools = { workspace = true }
 itoa = "1.0"
-jiff = "0.1.15"
+jiff = "0.1.16"
 jni = { workspace = true }
 jsonbb = { workspace = true }
 linkme = { workspace = true }
