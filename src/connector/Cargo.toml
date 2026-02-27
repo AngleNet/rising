@@ -68,7 +68,7 @@ clickhouse = { git = "https://github.com/risingwavelabs/clickhouse.rs", rev = "f
     "time",
     "rustls-tls",
 ], optional = true }
-croner = "2"
+croner = "3"
 csv = "1.4"
 deltalake = { workspace = true, optional = true }
 duration-str = "0.18.0"
