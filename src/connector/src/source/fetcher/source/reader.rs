@@ -161,6 +161,9 @@ impl FetcherSplitReader {
             self.properties.poll_interval_seconds,
         )?;
 
+        let max_polls = self.properties.max_poll_count;
+        let mut poll_count: u64 = 0;
+
         loop {
             // Wait for the next scheduled tick.
             scheduler.wait_next_tick().await;
@@ -173,6 +176,18 @@ impl FetcherSplitReader {
 
             if !messages.is_empty() {
                 yield messages;
+            }
+
+            poll_count += 1;
+            if let Some(max) = max_polls {
+                if poll_count >= max {
+                    tracing::info!(
+                        poll_count,
+                        max,
+                        "fetcher reached max poll count, stopping"
+                    );
+                    break;
+                }
             }
         }
     }
@@ -506,6 +521,7 @@ mod tests {
             pagination_cursor_param: "cursor".into(),
             params_sql: None,
             params_connection: None,
+            max_poll_count: None,
         };
 
         let reader = FetcherSplitReader {
@@ -552,6 +568,7 @@ mod tests {
             pagination_cursor_param: "cursor".into(),
             params_sql: None,
             params_connection: None,
+            max_poll_count: None,
         };
 
         let reader = FetcherSplitReader {
@@ -599,6 +616,7 @@ mod tests {
             pagination_cursor_param: "cursor".into(),
             params_sql: None,
             params_connection: None,
+            max_poll_count: None,
         };
 
         let reader = FetcherSplitReader {
@@ -645,6 +663,7 @@ mod tests {
             pagination_cursor_param: "cursor".into(),
             params_sql: None,
             params_connection: None,
+            max_poll_count: None,
         };
 
         let reader = FetcherSplitReader {

@@ -29,7 +29,8 @@ CREATE TABLE fetcher_basic (
 ) WITH (
     connector = 'fetcher',
     fetcher.url = 'http://localhost:18386/basic',
-    fetcher.poll.interval.seconds = 2
+    fetcher.poll.interval.seconds = 2,
+    fetcher.max.poll.count = 1
 ) FORMAT PLAIN ENCODE JSON;
 
 sleep 5s
@@ -59,7 +60,8 @@ CREATE TABLE fetcher_nested (
     connector = 'fetcher',
     fetcher.url = 'http://localhost:18386/nested',
     fetcher.poll.interval.seconds = 2,
-    fetcher.response.data.path = '/data/items'
+    fetcher.response.data.path = '/data/items',
+    fetcher.max.poll.count = 1
 ) FORMAT PLAIN ENCODE JSON;
 
 sleep 5s
@@ -89,7 +91,8 @@ CREATE TABLE fetcher_mapped (
     connector = 'fetcher',
     fetcher.url = 'http://localhost:18386/mapped',
     fetcher.poll.interval.seconds = 2,
-    fetcher.field.mappings = '{"user_id": "id", "user_name": "name", "created_at": "signup_date"}'
+    fetcher.field.mappings = '{"user_id": "id", "user_name": "name", "created_at": "signup_date"}',
+    fetcher.max.poll.count = 1
 ) FORMAT PLAIN ENCODE JSON;
 
 sleep 5s
@@ -119,7 +122,8 @@ CREATE TABLE fetcher_offset (
     fetcher.url = 'http://localhost:18386/paged_offset',
     fetcher.poll.interval.seconds = 2,
     fetcher.pagination.mode = 'offset',
-    fetcher.pagination.page.size = 3
+    fetcher.pagination.page.size = 3,
+    fetcher.max.poll.count = 1
 ) FORMAT PLAIN ENCODE JSON;
 
 sleep 8s
@@ -159,7 +163,8 @@ CREATE TABLE fetcher_cursor (
     fetcher.poll.interval.seconds = 2,
     fetcher.response.data.path = '/results',
     fetcher.pagination.mode = 'cursor',
-    fetcher.pagination.cursor.path = '/meta/next_cursor'
+    fetcher.pagination.cursor.path = '/meta/next_cursor',
+    fetcher.max.poll.count = 1
 ) FORMAT PLAIN ENCODE JSON;
 
 sleep 8s

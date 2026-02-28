@@ -170,6 +170,16 @@ pub struct FetcherProperties {
     /// Supports `postgres://...` and `mysql://...` schemes.
     #[serde(rename = "fetcher.params.connection", default)]
     pub params_connection: Option<String>,
+
+    /// Maximum number of poll cycles to perform before stopping.
+    /// If not set, the fetcher polls indefinitely.
+    /// Useful for testing or one-shot ingestion scenarios.
+    #[serde(
+        rename = "fetcher.max.poll.count",
+        default,
+        deserialize_with = "deserialize_optional_u64_from_string"
+    )]
+    pub max_poll_count: Option<u64>,
 }
 
 impl EnforceSecret for FetcherProperties {}
