@@ -180,6 +180,17 @@ pub struct FetcherProperties {
         deserialize_with = "deserialize_optional_u64_from_string"
     )]
     pub max_poll_count: Option<u64>,
+
+    /// Number of concurrent HTTP requests per poll cycle for offset pagination.
+    /// When set to N > 1, the fetcher issues up to N page requests in parallel
+    /// during each poll cycle (offset mode only; cursor mode is inherently sequential).
+    /// Default: 1 (sequential fetching).
+    #[serde(
+        rename = "fetcher.concurrency",
+        default,
+        deserialize_with = "deserialize_optional_u64_from_string"
+    )]
+    pub concurrency: Option<u64>,
 }
 
 impl EnforceSecret for FetcherProperties {}

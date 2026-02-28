@@ -190,6 +190,57 @@ SELECT id, val FROM fetcher_cursor;
 statement ok
 DROP TABLE fetcher_cursor;
 
+# ==========================================================
+# Test 6: Concurrent offset pagination (fetcher.concurrency)
+# ==========================================================
+
+statement ok
+CREATE TABLE fetcher_concurrent (
+    id INT,
+    val VARCHAR
+) WITH (
+    connector = 'fetcher',
+    fetcher.url = 'http://localhost:18386/parallel_offset',
+    fetcher.poll.interval.seconds = 2,
+    fetcher.pagination.mode = 'offset',
+    fetcher.pagination.page.size = 4,
+    fetcher.concurrency = 3,
+    fetcher.max.poll.count = 1
+) FORMAT PLAIN ENCODE JSON;
+
+sleep 8s
+
+statement ok
+flush;
+
+# Should have fetched all 20 items across 5 pages (4+4+4+4+4) with concurrency=3
+query IT rowsort retry 5 backoff 2s
+SELECT id, val FROM fetcher_concurrent;
+----
+1 p_1
+10 p_10
+11 p_11
+12 p_12
+13 p_13
+14 p_14
+15 p_15
+16 p_16
+17 p_17
+18 p_18
+19 p_19
+2 p_2
+20 p_20
+3 p_3
+4 p_4
+5 p_5
+6 p_6
+7 p_7
+8 p_8
+9 p_9
+
+statement ok
+DROP TABLE fetcher_concurrent;
+
 # ---------- Stop mock server ----------
 
 system ok

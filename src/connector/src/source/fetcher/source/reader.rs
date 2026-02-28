@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 
 use anyhow::Context;
 use async_trait::async_trait;
+use futures::future::try_join_all;
 use futures_async_stream::try_stream;
 
 use crate::error::ConnectorResult;
@@ -197,84 +198,140 @@ impl FetcherSplitReader {
         &mut self,
         client: &reqwest::Client,
     ) -> ConnectorResult<Vec<SourceMessage>> {
+        let concurrency = self.properties.concurrency.unwrap_or(1).max(1) as usize;
+
+        match self.properties.pagination_mode {
+            PaginationMode::None => self.fetch_all_pages_sequential(client).await,
+            PaginationMode::Offset if concurrency > 1 => {
+                self.fetch_all_pages_concurrent_offset(client, concurrency)
+                    .await
+            }
+            PaginationMode::Offset | PaginationMode::Cursor => {
+                self.fetch_all_pages_sequential(client).await
+            }
+        }
+    }
+
+    /// Fetch a single page from the API and return the parsed JSON body and extracted data items.
+    async fn fetch_single_page(
+        client: &reqwest::Client,
+        url: &str,
+        method: &str,
+        headers: &BTreeMap<String, String>,
+        body: Option<&str>,
+        response_data_path: Option<&str>,
+    ) -> ConnectorResult<(serde_json::Value, Vec<serde_json::Value>)> {
+        let http_method: reqwest::Method = method
+            .parse()
+            .context("invalid HTTP method")?;
+
+        let mut req = client.request(http_method, url);
+
+        for (k, v) in headers {
+            req = req.header(k, v);
+        }
+
+        if let Some(body_str) = body {
+            req = req.body(body_str.to_owned());
+            if !headers.contains_key("Content-Type")
+                && !headers.contains_key("content-type")
+            {
+                req = req.header("Content-Type", "application/json");
+            }
+        }
+
+        let response = req.send().await.context("HTTP request failed")?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body_text = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!("HTTP {} from {}: {}", status, url, body_text).into());
+        }
+
+        let body_bytes = response
+            .bytes()
+            .await
+            .context("failed to read response body")?;
+        let body_json: serde_json::Value =
+            serde_json::from_slice(&body_bytes).context("response is not valid JSON")?;
+
+        let target = if let Some(path) = response_data_path {
+            body_json.pointer(path).ok_or_else(|| {
+                anyhow::anyhow!("JSON pointer '{}' not found in API response", path)
+            })?
+        } else {
+            &body_json
+        };
+
+        let data_items = match target {
+            serde_json::Value::Array(arr) => arr.clone(),
+            serde_json::Value::Object(_) => vec![target.clone()],
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "expected JSON array or object at data path, got: {}",
+                    target
+                )
+                .into());
+            }
+        };
+
+        Ok((body_json, data_items))
+    }
+
+    /// Convert data items into SourceMessages, applying field mappings and tracking offsets.
+    fn items_to_messages(
+        &mut self,
+        data_items: &[serde_json::Value],
+    ) -> ConnectorResult<Vec<SourceMessage>> {
+        let mut messages = Vec::with_capacity(data_items.len());
+        for item in data_items {
+            let mapped_item = self.apply_field_mappings(item);
+            let payload =
+                serde_json::to_vec(&mapped_item).context("failed to serialize mapped item")?;
+            messages.push(SourceMessage {
+                key: None,
+                payload: Some(payload),
+                offset: self.events_so_far.to_string(),
+                split_id: self.split_id.clone(),
+                meta: crate::source::SourceMeta::Empty,
+            });
+            self.events_so_far += 1;
+        }
+        Ok(messages)
+    }
+
+    /// Sequential page fetching (used for no-pagination, cursor mode, and offset with concurrency=1).
+    async fn fetch_all_pages_sequential(
+        &mut self,
+        client: &reqwest::Client,
+    ) -> ConnectorResult<Vec<SourceMessage>> {
         let mut all_messages = Vec::new();
         let mut page_offset: u64 = 0;
         let mut cursor: Option<String> = None;
 
         loop {
-            // Build the request URL with pagination params.
             let url = self.build_paginated_url(
                 &self.rendered_url.clone(),
                 page_offset,
                 cursor.as_deref(),
             )?;
 
-            // Build the HTTP request.
-            let method: reqwest::Method = self
-                .properties
-                .method
-                .parse()
-                .context("invalid HTTP method")?;
-
-            let mut req = client.request(method, &url);
-
-            // Add headers.
-            for (k, v) in &self.resolved_headers {
-                req = req.header(k, v);
-            }
-
-            // Add body if present.
-            if let Some(body) = &self.rendered_body {
-                req = req.body(body.clone());
-                // Default content-type for body.
-                if !self.resolved_headers.contains_key("Content-Type")
-                    && !self.resolved_headers.contains_key("content-type")
-                {
-                    req = req.header("Content-Type", "application/json");
-                }
-            }
-
-            // Execute the request.
-            let response = req.send().await.context("HTTP request failed")?;
-
-            let status = response.status();
-            if !status.is_success() {
-                let body_text = response.text().await.unwrap_or_default();
-                return Err(anyhow::anyhow!("HTTP {} from {}: {}", status, url, body_text).into());
-            }
-
-            let body_bytes = response
-                .bytes()
-                .await
-                .context("failed to read response body")?;
-            let body_json: serde_json::Value =
-                serde_json::from_slice(&body_bytes).context("response is not valid JSON")?;
-
-            // Extract the data array using the configured JSON pointer.
-            let data_items = self.extract_data_items(&body_json)?;
+            let (body_json, data_items) = Self::fetch_single_page(
+                client,
+                &url,
+                &self.properties.method,
+                &self.resolved_headers,
+                self.rendered_body.as_deref(),
+                self.properties.response_data_path.as_deref(),
+            )
+            .await?;
 
             if data_items.is_empty() {
-                // No more data on this page — stop pagination.
                 break;
             }
 
-            // Convert items to SourceMessages with field mapping applied.
-            for item in &data_items {
-                let mapped_item = self.apply_field_mappings(item);
-                let payload =
-                    serde_json::to_vec(&mapped_item).context("failed to serialize mapped item")?;
+            all_messages.extend(self.items_to_messages(&data_items)?);
 
-                all_messages.push(SourceMessage {
-                    key: None,
-                    payload: Some(payload),
-                    offset: self.events_so_far.to_string(),
-                    split_id: self.split_id.clone(),
-                    meta: crate::source::SourceMeta::Empty,
-                });
-                self.events_so_far += 1;
-            }
-
-            // Handle pagination to decide whether to fetch the next page.
             match self.properties.pagination_mode {
                 PaginationMode::None => break,
                 PaginationMode::Offset => {
@@ -283,7 +340,6 @@ impl FetcherSplitReader {
                         .pagination_page_size
                         .unwrap_or(data_items.len() as u64);
                     if (data_items.len() as u64) < page_size {
-                        // Last page (fewer results than page_size).
                         break;
                     }
                     page_offset += page_size;
@@ -298,12 +354,8 @@ impl FetcherSplitReader {
                         Some(serde_json::Value::String(next)) if !next.is_empty() => {
                             cursor = Some(next.clone());
                         }
-                        Some(serde_json::Value::Null) | None => {
-                            // No next cursor — done.
-                            break;
-                        }
+                        Some(serde_json::Value::Null) | None => break,
                         Some(other) => {
-                            // Cursor value is not a string — try to_string.
                             let s = other.to_string().trim_matches('"').to_owned();
                             if s.is_empty() || s == "null" {
                                 break;
@@ -313,6 +365,79 @@ impl FetcherSplitReader {
                     }
                 }
             }
+        }
+
+        Ok(all_messages)
+    }
+
+    /// Concurrent page fetching for offset pagination.
+    ///
+    /// Fetches pages in batches of `concurrency` requests in parallel.
+    /// Pages within each batch are ordered by offset to preserve monotonic event ordering.
+    /// Stops when any page in a batch returns fewer items than `page_size`.
+    async fn fetch_all_pages_concurrent_offset(
+        &mut self,
+        client: &reqwest::Client,
+        concurrency: usize,
+    ) -> ConnectorResult<Vec<SourceMessage>> {
+        let page_size = self.properties.pagination_page_size.unwrap_or(100);
+        let mut all_messages = Vec::new();
+        let mut page_offset: u64 = 0;
+
+        loop {
+            // Build a batch of page offsets.
+            let offsets: Vec<u64> = (0..concurrency as u64)
+                .map(|i| page_offset + i * page_size)
+                .collect();
+
+            // Launch all page requests concurrently.
+            let futures = offsets.iter().map(|&offset| {
+                let url = self.build_paginated_url(
+                    &self.rendered_url,
+                    offset,
+                    None,
+                );
+                let method = self.properties.method.clone();
+                let headers = self.resolved_headers.clone();
+                let body = self.rendered_body.clone();
+                let data_path = self.properties.response_data_path.clone();
+                async move {
+                    let url = url?;
+                    Self::fetch_single_page(
+                        client,
+                        &url,
+                        &method,
+                        &headers,
+                        body.as_deref(),
+                        data_path.as_deref(),
+                    )
+                    .await
+                }
+            });
+
+            let results: Vec<(serde_json::Value, Vec<serde_json::Value>)> =
+                try_join_all(futures).await?;
+
+            // Process results in page order.
+            let mut done = false;
+            for (_body_json, data_items) in &results {
+                if data_items.is_empty() {
+                    done = true;
+                    break;
+                }
+                all_messages.extend(self.items_to_messages(data_items)?);
+                if (data_items.len() as u64) < page_size {
+                    // This was the last page (fewer results than page_size).
+                    done = true;
+                    break;
+                }
+            }
+
+            if done {
+                break;
+            }
+
+            page_offset += concurrency as u64 * page_size;
         }
 
         Ok(all_messages)
@@ -352,31 +477,6 @@ impl FetcherSplitReader {
                     Ok(base_url.to_owned())
                 }
             }
-        }
-    }
-
-    /// Extract the data items array from the JSON response using the configured path.
-    fn extract_data_items(
-        &self,
-        body: &serde_json::Value,
-    ) -> ConnectorResult<Vec<serde_json::Value>> {
-        let target = if let Some(path) = &self.properties.response_data_path {
-            body.pointer(path).ok_or_else(|| {
-                anyhow::anyhow!("JSON pointer '{}' not found in API response", path)
-            })?
-        } else {
-            body
-        };
-
-        match target {
-            serde_json::Value::Array(arr) => Ok(arr.clone()),
-            // Single object — treat as a one-element array.
-            serde_json::Value::Object(_) => Ok(vec![target.clone()]),
-            _ => Err(anyhow::anyhow!(
-                "expected JSON array or object at data path, got: {}",
-                target
-            )
-            .into()),
         }
     }
 
@@ -522,6 +622,7 @@ mod tests {
             params_sql: None,
             params_connection: None,
             max_poll_count: None,
+            concurrency: None,
         };
 
         let reader = FetcherSplitReader {
@@ -549,52 +650,53 @@ mod tests {
         assert!(output.get("created_at").is_none());
     }
 
-    #[test]
-    fn test_extract_data_items_array() {
-        let props = FetcherProperties {
-            url: String::new(),
-            method: "GET".into(),
-            headers: None,
-            body: None,
-            cron: None,
-            poll_interval_seconds: Some(60),
-            response_data_path: Some("/data/items".to_owned()),
-            field_mappings: None,
-            pagination_mode: PaginationMode::None,
-            pagination_page_size: None,
-            pagination_offset_param: "offset".into(),
-            pagination_limit_param: "limit".into(),
-            pagination_cursor_path: None,
-            pagination_cursor_param: "cursor".into(),
-            params_sql: None,
-            params_connection: None,
-            max_poll_count: None,
-        };
+    #[tokio::test]
+    async fn test_fetch_single_page_extracts_nested_data() {
+        // This tests the data extraction logic inside fetch_single_page
+        // by starting a minimal HTTP server with nested JSON.
+        use std::net::TcpListener;
 
-        let reader = FetcherSplitReader {
-            properties: props,
-            split_id: "1-0".into(),
-            events_so_far: 0,
-            parser_config: ParserConfig::default(),
-            source_ctx: crate::source::SourceContext::dummy().into(),
-            rendered_url: String::new(),
-            rendered_body: None,
-            resolved_headers: BTreeMap::new(),
-        };
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
 
-        let body = serde_json::json!({
-            "data": {
-                "items": [
-                    {"id": 1, "name": "Alice"},
-                    {"id": 2, "name": "Bob"},
-                ]
-            }
+        let server = tokio::spawn(async move {
+            use tokio::io::AsyncWriteExt;
+            let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
+                .await
+                .unwrap();
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let _ = tokio::io::AsyncReadExt::read(&mut socket, &mut buf).await;
+            let body = r#"{"data":{"items":[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]}}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket.write_all(response.as_bytes()).await.unwrap();
         });
 
-        let items = reader.extract_data_items(&body).unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let client = reqwest::Client::new();
+        let url = format!("http://127.0.0.1:{}/nested", port);
+        let (_body_json, items) = FetcherSplitReader::fetch_single_page(
+            &client,
+            &url,
+            "GET",
+            &BTreeMap::new(),
+            None,
+            Some("/data/items"),
+        )
+        .await
+        .unwrap();
+
         assert_eq!(items.len(), 2);
         assert_eq!(items[0]["id"], 1);
         assert_eq!(items[1]["name"], "Bob");
+
+        server.abort();
     }
 
     #[test]
@@ -617,6 +719,7 @@ mod tests {
             params_sql: None,
             params_connection: None,
             max_poll_count: None,
+            concurrency: None,
         };
 
         let reader = FetcherSplitReader {
@@ -664,6 +767,7 @@ mod tests {
             params_sql: None,
             params_connection: None,
             max_poll_count: None,
+            concurrency: None,
         };
 
         let reader = FetcherSplitReader {

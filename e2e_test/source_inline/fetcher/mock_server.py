@@ -48,6 +48,9 @@ MAPPED_DATA = [
 # 10 items total for pagination tests
 PAGED_ITEMS = [{"id": i, "val": f"item_{i}"} for i in range(1, 11)]
 
+# 20 items for concurrent pagination tests
+PARALLEL_ITEMS = [{"id": i, "val": f"p_{i}"} for i in range(1, 21)]
+
 
 class FetcherMockHandler(BaseHTTPRequestHandler):
     """Handle GET requests for various test endpoints."""
@@ -85,6 +88,12 @@ class FetcherMockHandler(BaseHTTPRequestHandler):
             offset = int(qs.get("offset", ["0"])[0])
             limit = int(qs.get("limit", ["3"])[0])
             page = PAGED_ITEMS[offset : offset + limit]
+            self._send_json(page)
+
+        elif path == "/parallel_offset":
+            offset = int(qs.get("offset", ["0"])[0])
+            limit = int(qs.get("limit", ["4"])[0])
+            page = PARALLEL_ITEMS[offset : offset + limit]
             self._send_json(page)
 
         elif path == "/paged_cursor":
