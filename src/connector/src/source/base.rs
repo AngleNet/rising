@@ -673,10 +673,12 @@ impl ConnectorProperties {
     }
 
     pub fn enable_drop_split(&self) -> bool {
-        // enable split scale in just for Kinesis
+        // enable split scale in for connectors whose splits can disappear over time
         matches!(
             self,
-            ConnectorProperties::Kinesis(_) | ConnectorProperties::Nats(_)
+            ConnectorProperties::Kinesis(_)
+                | ConnectorProperties::Nats(_)
+                | ConnectorProperties::Fetcher(_)
         )
     }
 

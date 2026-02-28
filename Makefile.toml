@@ -727,23 +727,66 @@ alias = "playground"
 
 [tasks.playground]
 category = "RiseDev - Start/Stop"
-description = "🌟 Start a lite RisingWave playground using risingwave all-in-one binary"
+description = "🌟 Start a lite RisingWave playground using risingwave all-in-one binary in background"
 dependencies = ["pre-start-playground"]
 script = '''
 #!/usr/bin/env bash
 
-set -e
-if [[ $ENABLE_COREDUMP == "true" ]]; then
-  echo "+ ulimit -c unlimited"
-  ulimit -c unlimited
+set -euo pipefail
+
+# Kill any existing risedev cluster (dev or playground) first.
+if ${TMUX} ls &>/dev/null ; then
+  echo "Killing existing risedev cluster..."
+  ${TMUX} kill-server 2>/dev/null || true
 fi
 
-if [[ $ENABLE_BUILD_RW_CONNECTOR == "true" ]]; then
-  export CONNECTOR_LIBS_PATH="${PREFIX_BIN}/connector-node/libs/"
+mkdir -p "${PREFIX_LOG}"
+mkdir -p "${PREFIX_CONFIG}"
+
+# Build the playground command
+PLAYGROUND_CMD="target/${RISEDEV_BUILD_TARGET_DIR}${BUILD_MODE_DIR}/risingwave playground $@"
+
+if [[ ${ENABLE_COREDUMP:-} == "true" ]]; then
+  PLAYGROUND_CMD="ulimit -c unlimited && ${PLAYGROUND_CMD}"
 fi
 
-set -x
-target/${RISEDEV_BUILD_TARGET_DIR}${BUILD_MODE_DIR}/risingwave playground $@
+if [[ ${ENABLE_BUILD_RW_CONNECTOR:-} == "true" ]]; then
+  PLAYGROUND_CMD="CONNECTOR_LIBS_PATH=${PREFIX_BIN}/connector-node/libs/ ${PLAYGROUND_CMD}"
+fi
+
+# Start a new tmux session in the background and run playground in it.
+${TMUX} new-session -d -s risedev -n playground \
+  "bash -c '${PLAYGROUND_CMD} 2>&1 | tee ${PREFIX_LOG}/playground.log; read'"
+
+echo "Playground is starting in the background..."
+
+# Write risedev-env so that psql and other tools can connect.
+cat <<EOF > "${PREFIX_CONFIG}/risedev-env"
+RISEDEV_RW_FRONTEND_LISTEN_ADDRESS=127.0.0.1
+RISEDEV_RW_FRONTEND_PORT=4566
+EOF
+
+# Wait for the playground to be ready by checking the port.
+echo -n "Waiting for playground to be ready..."
+for i in $(seq 1 60); do
+  if nc -z 127.0.0.1 4566 2>/dev/null; then
+    echo " ready!"
+    echo ""
+    echo "$(tput setaf 2)RisingWave playground is running in the background.$(tput sgr0)"
+    echo "  - Connect with: $(tput setaf 4)./risedev psql$(tput sgr0)"
+    echo "  - View logs:    $(tput setaf 4)${TMUX} a -t risedev$(tput sgr0)"
+    echo "  - Stop with:    $(tput setaf 4)./risedev k$(tput sgr0)"
+    exit 0
+  fi
+  echo -n "."
+  sleep 1
+done
+
+echo ""
+echo "$(tput setaf 1)Timed out waiting for playground to start. Check logs:$(tput sgr0)"
+echo "  $(tput setaf 4)cat ${PREFIX_LOG}/playground.log$(tput sgr0)"
+echo "  $(tput setaf 4)${TMUX} a -t risedev$(tput sgr0)"
+exit 1
 '''
 
 [tasks.standalone]
@@ -799,7 +842,7 @@ target/debug/risedev-dev ${@}
 
 [tasks.kill-risedev]
 category = "RiseDev - Start/Stop"
-description = "Kill RisingWave dev cluster"
+description = "Kill RisingWave dev cluster or playground"
 script = '''
 #!/usr/bin/env bash
 

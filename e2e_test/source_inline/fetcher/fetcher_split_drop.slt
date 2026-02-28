@@ -1,0 +1,90 @@
+# Test: dead fetcher splits are automatically removed when params_sql returns fewer rows.
+#
+# Setup:
+#   1. Create a params table in RW with 3 rows.
+#   2. Create a fetcher source using params.sql connecting back to RW itself.
+#   3. Verify 3 splits are assigned via rw_actor_splits.
+#   4. Delete a row from the params table so the next enumeration returns 2 rows.
+#   5. Wait for the meta source worker tick (30s) + barrier propagation.
+#   6. Verify splits are reduced — the old 3-split set is dropped and replaced by 2 splits.
+
+control substitution on
+
+# ---------- Start mock HTTP server ----------
+
+system ok
+python3 e2e_test/source_inline/fetcher/mock_server.py > /dev/null 2>&1 < /dev/null &
+
+sleep 1s
+
+system ok retry 5 backoff 1s
+curl --silent --fail-with-body http://localhost:18386/health
+
+# ---------- Create params table in RW ----------
+
+statement ok
+CREATE TABLE fetcher_params (id INT, endpoint VARCHAR);
+
+statement ok
+INSERT INTO fetcher_params VALUES (1, '/basic'), (2, '/basic'), (3, '/basic');
+
+statement ok
+flush;
+
+# ---------- Create fetcher source with params_sql ----------
+
+statement ok
+CREATE TABLE fetcher_split_test (
+    id INT,
+    name VARCHAR,
+    score REAL
+) WITH (
+    connector = 'fetcher',
+    fetcher.url = 'http://localhost:18386{{ endpoint }}',
+    fetcher.poll.interval.seconds = 2,
+    fetcher.params.sql = 'SELECT id, endpoint FROM fetcher_params ORDER BY id',
+    fetcher.params.connection = 'host=${RISEDEV_RW_FRONTEND_LISTEN_ADDRESS} port=${RISEDEV_RW_FRONTEND_PORT} user=root dbname=dev'
+) FORMAT PLAIN ENCODE JSON;
+
+# Wait for initial split assignment and data ingestion.
+sleep 10s
+
+statement ok
+flush;
+
+# Verify 3 splits are assigned (split IDs: "3-0", "3-1", "3-2").
+query I retry 5 backoff 2s
+SELECT count(*) FROM rw_actor_splits WHERE source_id = (SELECT id FROM rw_sources WHERE name = 'fetcher_split_test');
+----
+3
+
+# ---------- Remove a row to trigger split reduction ----------
+
+statement ok
+DELETE FROM fetcher_params WHERE id = 3;
+
+statement ok
+flush;
+
+# Wait for the meta source worker tick interval (30s) plus barrier propagation buffer.
+sleep 50s
+
+statement ok
+flush;
+
+# Verify splits are reduced to 2 (old "3-*" splits dropped, new "2-0" and "2-1" assigned).
+query I retry 5 backoff 2s
+SELECT count(*) FROM rw_actor_splits WHERE source_id = (SELECT id FROM rw_sources WHERE name = 'fetcher_split_test');
+----
+2
+
+# ---------- Cleanup ----------
+
+statement ok
+DROP TABLE fetcher_split_test;
+
+statement ok
+DROP TABLE fetcher_params;
+
+system ok
+pkill -f 'mock_server.py' || true
