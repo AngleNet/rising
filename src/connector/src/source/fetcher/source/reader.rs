@@ -188,7 +188,11 @@ impl FetcherSplitReader {
 
         loop {
             // Build the request URL with pagination params.
-            let url = self.build_paginated_url(&self.rendered_url.clone(), page_offset, cursor.as_deref())?;
+            let url = self.build_paginated_url(
+                &self.rendered_url.clone(),
+                page_offset,
+                cursor.as_deref(),
+            )?;
 
             // Build the HTTP request.
             let method: reqwest::Method = self
@@ -221,16 +225,13 @@ impl FetcherSplitReader {
             let status = response.status();
             if !status.is_success() {
                 let body_text = response.text().await.unwrap_or_default();
-                return Err(anyhow::anyhow!(
-                    "HTTP {} from {}: {}",
-                    status,
-                    url,
-                    body_text
-                )
-                .into());
+                return Err(anyhow::anyhow!("HTTP {} from {}: {}", status, url, body_text).into());
             }
 
-            let body_bytes = response.bytes().await.context("failed to read response body")?;
+            let body_bytes = response
+                .bytes()
+                .await
+                .context("failed to read response body")?;
             let body_json: serde_json::Value =
                 serde_json::from_slice(&body_bytes).context("response is not valid JSON")?;
 
@@ -245,8 +246,8 @@ impl FetcherSplitReader {
             // Convert items to SourceMessages with field mapping applied.
             for item in &data_items {
                 let mapped_item = self.apply_field_mappings(item);
-                let payload = serde_json::to_vec(&mapped_item)
-                    .context("failed to serialize mapped item")?;
+                let payload =
+                    serde_json::to_vec(&mapped_item).context("failed to serialize mapped item")?;
 
                 all_messages.push(SourceMessage {
                     key: None,
@@ -345,13 +346,9 @@ impl FetcherSplitReader {
         body: &serde_json::Value,
     ) -> ConnectorResult<Vec<serde_json::Value>> {
         let target = if let Some(path) = &self.properties.response_data_path {
-            body.pointer(path)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "JSON pointer '{}' not found in API response",
-                        path
-                    )
-                })?
+            body.pointer(path).ok_or_else(|| {
+                anyhow::anyhow!("JSON pointer '{}' not found in API response", path)
+            })?
         } else {
             body
         };
@@ -448,10 +445,7 @@ impl Scheduler {
 }
 
 /// Render a Jinja2 template string with the given context values.
-fn render_template(
-    template: &str,
-    context: &serde_json::Value,
-) -> Result<String, anyhow::Error> {
+fn render_template(template: &str, context: &serde_json::Value) -> Result<String, anyhow::Error> {
     // Fast path: if there are no template markers, return as-is.
     if !template.contains("{{") && !template.contains("{%") {
         return Ok(template.to_owned());
@@ -478,9 +472,11 @@ mod tests {
     #[test]
     fn test_render_template_with_vars() {
         let ctx = serde_json::json!({"tenant_id": "abc123", "page": 1});
-        let result =
-            render_template("https://api.example.com/{{ tenant_id }}/data?p={{ page }}", &ctx)
-                .unwrap();
+        let result = render_template(
+            "https://api.example.com/{{ tenant_id }}/data?p={{ page }}",
+            &ctx,
+        )
+        .unwrap();
         assert_eq!(result, "https://api.example.com/abc123/data?p=1");
     }
 

@@ -29,7 +29,7 @@ CREATE TABLE fetcher_basic (
 ) WITH (
     connector = 'fetcher',
     fetcher.url = 'http://localhost:18386/basic',
-    fetcher.poll.interval.seconds = '2'
+    fetcher.poll.interval.seconds = 2
 ) FORMAT PLAIN ENCODE JSON;
 
 sleep 5s
@@ -37,7 +37,7 @@ sleep 5s
 statement ok
 flush;
 
-query ITR retry 5 backoff 2s rowsort
+query ITR rowsort retry 5 backoff 2s
 SELECT id, name, score FROM fetcher_basic;
 ----
 1 Alice 95.5
@@ -58,7 +58,7 @@ CREATE TABLE fetcher_nested (
 ) WITH (
     connector = 'fetcher',
     fetcher.url = 'http://localhost:18386/nested',
-    fetcher.poll.interval.seconds = '2',
+    fetcher.poll.interval.seconds = 2,
     fetcher.response.data.path = '/data/items'
 ) FORMAT PLAIN ENCODE JSON;
 
@@ -67,7 +67,7 @@ sleep 5s
 statement ok
 flush;
 
-query IT retry 5 backoff 2s rowsort
+query IT rowsort retry 5 backoff 2s
 SELECT id, value FROM fetcher_nested;
 ----
 10 hello
@@ -88,7 +88,7 @@ CREATE TABLE fetcher_mapped (
 ) WITH (
     connector = 'fetcher',
     fetcher.url = 'http://localhost:18386/mapped',
-    fetcher.poll.interval.seconds = '2',
+    fetcher.poll.interval.seconds = 2,
     fetcher.field.mappings = '{"user_id": "id", "user_name": "name", "created_at": "signup_date"}'
 ) FORMAT PLAIN ENCODE JSON;
 
@@ -97,7 +97,7 @@ sleep 5s
 statement ok
 flush;
 
-query ITT retry 5 backoff 2s rowsort
+query ITT rowsort retry 5 backoff 2s
 SELECT id, name, signup_date FROM fetcher_mapped;
 ----
 100 Dana 2024-01-15
@@ -117,9 +117,9 @@ CREATE TABLE fetcher_offset (
 ) WITH (
     connector = 'fetcher',
     fetcher.url = 'http://localhost:18386/paged_offset',
-    fetcher.poll.interval.seconds = '2',
+    fetcher.poll.interval.seconds = 2,
     fetcher.pagination.mode = 'offset',
-    fetcher.pagination.page.size = '3'
+    fetcher.pagination.page.size = 3
 ) FORMAT PLAIN ENCODE JSON;
 
 sleep 8s
@@ -128,7 +128,7 @@ statement ok
 flush;
 
 # Should have fetched all 10 items across 4 pages (3+3+3+1)
-query IT retry 5 backoff 2s rowsort
+query IT rowsort retry 5 backoff 2s
 SELECT id, val FROM fetcher_offset;
 ----
 1 item_1
@@ -156,7 +156,7 @@ CREATE TABLE fetcher_cursor (
 ) WITH (
     connector = 'fetcher',
     fetcher.url = 'http://localhost:18386/paged_cursor',
-    fetcher.poll.interval.seconds = '2',
+    fetcher.poll.interval.seconds = 2,
     fetcher.response.data.path = '/results',
     fetcher.pagination.mode = 'cursor',
     fetcher.pagination.cursor.path = '/meta/next_cursor'
@@ -168,7 +168,7 @@ statement ok
 flush;
 
 # Should have fetched all 10 items across 4 pages
-query IT retry 5 backoff 2s rowsort
+query IT rowsort retry 5 backoff 2s
 SELECT id, val FROM fetcher_cursor;
 ----
 1 item_1

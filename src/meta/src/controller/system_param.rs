@@ -84,7 +84,11 @@ macro_rules! impl_system_params_to_models {
             check_missing_params(params).map_err(|e| anyhow!(e))?;
             let mut models = Vec::new();
             $(
-                let value = params.$field.as_ref().unwrap().to_string();
+                let value = if key_of!($field) == "license_key" {
+                    params.$field.as_ref().map(ToString::to_string).unwrap_or_default()
+                } else {
+                    params.$field.as_ref().unwrap().to_string()
+                };
                 models.push(system_parameter::ActiveModel {
                     name: Set(key_of!($field).to_string()),
                     value: Set(value),

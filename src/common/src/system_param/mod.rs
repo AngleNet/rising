@@ -171,7 +171,7 @@ macro_rules! impl_check_missing_fields {
         /// Check if any undeprecated fields are missing.
         pub fn check_missing_params(params: &PbSystemParams) -> Result<()> {
             $(
-                if params.$field.is_none() {
+                if params.$field.is_none() && key_of!($field) != LICENSE_KEY_KEY {
                     return Err(format!("missing system param {:?}", key_of!($field)));
                 }
             )*
@@ -191,7 +191,11 @@ macro_rules! impl_system_params_to_kv {
             let mut ret = Vec::new();
             $(ret.push((
                 key_of!($field).to_owned(),
-                params.$field.as_ref().unwrap().to_string(),
+                if key_of!($field) == LICENSE_KEY_KEY {
+                    params.$field.as_ref().map(ToString::to_string).unwrap_or_default()
+                } else {
+                    params.$field.as_ref().unwrap().to_string()
+                },
             ));)*
             Ok(ret)
         }

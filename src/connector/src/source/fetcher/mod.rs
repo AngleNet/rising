@@ -16,18 +16,18 @@ pub mod enumerator;
 pub mod source;
 pub mod split;
 
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 pub use enumerator::*;
 use serde::Deserialize;
-use serde_with::serde_as;
 use serde_with::json::JsonString;
+use serde_with::serde_as;
 pub use source::*;
 pub use split::*;
 
 use crate::enforce_secret::EnforceSecret;
 use crate::source::SourceProperties;
+use crate::deserialize_optional_u64_from_string;
 
 pub const FETCHER_CONNECTOR: &str = "fetcher";
 
@@ -98,7 +98,11 @@ pub struct FetcherProperties {
 
     /// Simple polling interval in seconds. Default: 60.
     /// Mutually exclusive with `fetcher.cron`.
-    #[serde(rename = "fetcher.poll.interval.seconds", default)]
+    #[serde(
+        rename = "fetcher.poll.interval.seconds",
+        default,
+        deserialize_with = "deserialize_optional_u64_from_string"
+    )]
     pub poll_interval_seconds: Option<u64>,
 
     /// JSON pointer (RFC 6901) to the data array in the API response.
@@ -122,7 +126,11 @@ pub struct FetcherProperties {
     pub pagination_mode: PaginationMode,
 
     /// Page size for offset pagination or max items per page for cursor pagination.
-    #[serde(rename = "fetcher.pagination.page.size", default)]
+    #[serde(
+        rename = "fetcher.pagination.page.size",
+        default,
+        deserialize_with = "deserialize_optional_u64_from_string"
+    )]
     pub pagination_page_size: Option<u64>,
 
     /// Query parameter name for the offset value in offset pagination. Default: `offset`.

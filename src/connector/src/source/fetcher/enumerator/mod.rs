@@ -102,7 +102,9 @@ impl FetcherSplitEnumerator {
             .context("failed to execute fetcher.params.sql")?;
 
         if rows.is_empty() {
-            tracing::warn!("fetcher.params.sql returned no rows, producing a single split with no template params");
+            tracing::warn!(
+                "fetcher.params.sql returned no rows, producing a single split with no template params"
+            );
             return Ok(vec![FetcherSplit::new(0, 1, None, None)]);
         }
 
@@ -137,7 +139,12 @@ impl FetcherSplitEnumerator {
             let params_json = serde_json::to_string(&params)
                 .context("failed to serialize fetcher template params")?;
 
-            splits.push(FetcherSplit::new(idx as i32, split_num, None, Some(params_json)));
+            splits.push(FetcherSplit::new(
+                idx as i32,
+                split_num,
+                None,
+                Some(params_json),
+            ));
         }
 
         Ok(splits)
