@@ -25,9 +25,9 @@ use serde_with::serde_as;
 pub use source::*;
 pub use split::*;
 
+use crate::deserialize_optional_u64_from_string;
 use crate::enforce_secret::EnforceSecret;
 use crate::source::SourceProperties;
-use crate::deserialize_optional_u64_from_string;
 
 pub const FETCHER_CONNECTOR: &str = "fetcher";
 
@@ -170,6 +170,15 @@ pub struct FetcherProperties {
     /// Supports `postgres://...` and `mysql://...` schemes.
     #[serde(rename = "fetcher.params.connection", default)]
     pub params_connection: Option<String>,
+
+    /// Whether to include split template parameters (from `fetcher.params.sql` rows)
+    /// in each emitted JSON object.
+    ///
+    /// Useful for preserving request context fields like `code` / `exchange` that may
+    /// not be present in the API response payload.
+    /// Response payload fields take precedence on key conflicts.
+    #[serde(rename = "fetcher.include.params", default)]
+    pub include_params: bool,
 
     /// Maximum number of poll cycles to perform before stopping.
     /// If not set, the fetcher polls indefinitely.

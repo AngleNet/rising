@@ -241,6 +241,59 @@ SELECT id, val FROM fetcher_concurrent;
 statement ok
 DROP TABLE fetcher_concurrent;
 
+# ==========================================================
+# Test 7: Include params.sql fields in emitted rows
+# ==========================================================
+
+statement ok
+CREATE TABLE fetcher_params_seed (
+    id INT,
+    endpoint VARCHAR,
+    code VARCHAR
+);
+
+statement ok
+INSERT INTO fetcher_params_seed VALUES
+    (1, '/basic', 'SH600001'),
+    (2, '/basic', 'SH600002');
+
+statement ok
+flush;
+
+statement ok
+CREATE TABLE fetcher_with_params (
+    code VARCHAR,
+    id INT,
+    name VARCHAR,
+    score REAL
+) WITH (
+    connector = 'fetcher',
+    fetcher.url = 'http://localhost:18386{{ endpoint }}',
+    fetcher.poll.interval.seconds = 2,
+    fetcher.params.sql = 'SELECT endpoint, code FROM fetcher_params_seed ORDER BY id',
+    fetcher.params.connection = 'host=${RISEDEV_RW_FRONTEND_LISTEN_ADDRESS} port=${RISEDEV_RW_FRONTEND_PORT} user=root dbname=dev',
+    fetcher.include.params = 'true',
+    fetcher.max.poll.count = 1
+) FORMAT PLAIN ENCODE JSON;
+
+sleep 6s
+
+statement ok
+flush;
+
+# Each split fetches 3 rows from /basic, and split params inject a distinct code.
+query TI rowsort retry 5 backoff 2s
+SELECT code, count(*) FROM fetcher_with_params GROUP BY code ORDER BY code;
+----
+SH600001 3
+SH600002 3
+
+statement ok
+DROP TABLE fetcher_with_params;
+
+statement ok
+DROP TABLE fetcher_params_seed;
+
 # ---------- Stop mock server ----------
 
 system ok

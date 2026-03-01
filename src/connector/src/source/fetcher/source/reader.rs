@@ -46,6 +46,8 @@ pub struct FetcherSplitReader {
     rendered_body: Option<String>,
     /// Resolved HTTP headers.
     resolved_headers: BTreeMap<String, String>,
+    /// Parsed split template params from `fetcher.params.sql` row (if any).
+    split_template_params: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 #[async_trait]
@@ -75,6 +77,7 @@ impl SplitReader for FetcherSplitReader {
                 .context("failed to parse fetcher split template_params")?,
             None => serde_json::Value::Object(Default::default()),
         };
+        let split_template_params = template_ctx.as_object().cloned();
 
         // Render URL template.
         let rendered_url = render_template(&properties.url, &template_ctx)
@@ -132,6 +135,7 @@ impl SplitReader for FetcherSplitReader {
             rendered_url,
             rendered_body,
             resolved_headers,
+            split_template_params,
         })
     }
 
@@ -182,11 +186,7 @@ impl FetcherSplitReader {
             poll_count += 1;
             if let Some(max) = max_polls {
                 if poll_count >= max {
-                    tracing::info!(
-                        poll_count,
-                        max,
-                        "fetcher reached max poll count, stopping"
-                    );
+                    tracing::info!(poll_count, max, "fetcher reached max poll count, stopping");
                     break;
                 }
             }
@@ -221,9 +221,7 @@ impl FetcherSplitReader {
         body: Option<&str>,
         response_data_path: Option<&str>,
     ) -> ConnectorResult<(serde_json::Value, Vec<serde_json::Value>)> {
-        let http_method: reqwest::Method = method
-            .parse()
-            .context("invalid HTTP method")?;
+        let http_method: reqwest::Method = method.parse().context("invalid HTTP method")?;
 
         let mut req = client.request(http_method, url);
 
@@ -233,9 +231,7 @@ impl FetcherSplitReader {
 
         if let Some(body_str) = body {
             req = req.body(body_str.to_owned());
-            if !headers.contains_key("Content-Type")
-                && !headers.contains_key("content-type")
-            {
+            if !headers.contains_key("Content-Type") && !headers.contains_key("content-type") {
                 req = req.header("Content-Type", "application/json");
             }
         }
@@ -266,6 +262,7 @@ impl FetcherSplitReader {
         let data_items = match target {
             serde_json::Value::Array(arr) => arr.clone(),
             serde_json::Value::Object(_) => vec![target.clone()],
+            serde_json::Value::Null => Vec::new(),
             _ => {
                 return Err(anyhow::anyhow!(
                     "expected JSON array or object at data path, got: {}",
@@ -392,11 +389,7 @@ impl FetcherSplitReader {
 
             // Launch all page requests concurrently.
             let futures = offsets.iter().map(|&offset| {
-                let url = self.build_paginated_url(
-                    &self.rendered_url,
-                    offset,
-                    None,
-                );
+                let url = self.build_paginated_url(&self.rendered_url, offset, None);
                 let method = self.properties.method.clone();
                 let headers = self.resolved_headers.clone();
                 let body = self.rendered_body.clone();
@@ -483,22 +476,34 @@ impl FetcherSplitReader {
     /// Apply field-to-column name mappings to a JSON value.
     /// Renames keys in the top-level JSON object according to `fetcher.field.mappings`.
     fn apply_field_mappings(&self, item: &serde_json::Value) -> serde_json::Value {
-        let mappings = match &self.properties.field_mappings {
-            Some(m) if !m.is_empty() => m,
-            _ => return item.clone(),
-        };
-
-        match item {
+        let mut mapped = match item {
             serde_json::Value::Object(obj) => {
                 let mut new_obj = serde_json::Map::with_capacity(obj.len());
                 for (key, value) in obj {
-                    let mapped_key = mappings.get(key).unwrap_or(key);
+                    let mapped_key = self
+                        .properties
+                        .field_mappings
+                        .as_ref()
+                        .and_then(|m| m.get(key))
+                        .unwrap_or(key);
                     new_obj.insert(mapped_key.clone(), value.clone());
                 }
                 serde_json::Value::Object(new_obj)
             }
             _ => item.clone(),
+        };
+
+        if self.properties.include_params
+            && let (serde_json::Value::Object(obj), Some(params)) =
+                (&mut mapped, &self.split_template_params)
+        {
+            for (key, value) in params {
+                // Keep response payload values if the same key already exists.
+                obj.entry(key.clone()).or_insert_with(|| value.clone());
+            }
         }
+
+        mapped
     }
 }
 
@@ -621,6 +626,7 @@ mod tests {
             pagination_cursor_param: "cursor".into(),
             params_sql: None,
             params_connection: None,
+            include_params: false,
             max_poll_count: None,
             concurrency: None,
         };
@@ -634,6 +640,7 @@ mod tests {
             rendered_url: String::new(),
             rendered_body: None,
             resolved_headers: BTreeMap::new(),
+            split_template_params: None,
         };
 
         let input = serde_json::json!({
@@ -648,6 +655,71 @@ mod tests {
         assert_eq!(output["email"], "test@example.com");
         assert!(output.get("user_id").is_none());
         assert!(output.get("created_at").is_none());
+    }
+
+    #[test]
+    fn test_apply_field_mappings_with_split_params() {
+        let props = FetcherProperties {
+            url: String::new(),
+            method: "GET".into(),
+            headers: None,
+            body: None,
+            cron: None,
+            poll_interval_seconds: Some(60),
+            response_data_path: None,
+            field_mappings: Some(
+                [("user_id".to_owned(), "id".to_owned())]
+                    .into_iter()
+                    .collect(),
+            ),
+            pagination_mode: PaginationMode::None,
+            pagination_page_size: None,
+            pagination_offset_param: "offset".into(),
+            pagination_limit_param: "limit".into(),
+            pagination_cursor_path: None,
+            pagination_cursor_param: "cursor".into(),
+            params_sql: None,
+            params_connection: None,
+            include_params: true,
+            max_poll_count: None,
+            concurrency: None,
+        };
+
+        let reader = FetcherSplitReader {
+            properties: props,
+            split_id: "2-0".into(),
+            events_so_far: 0,
+            parser_config: ParserConfig::default(),
+            source_ctx: crate::source::SourceContext::dummy().into(),
+            rendered_url: String::new(),
+            rendered_body: None,
+            resolved_headers: BTreeMap::new(),
+            split_template_params: Some(
+                [
+                    (
+                        "code".to_owned(),
+                        serde_json::Value::String("603801".to_owned()),
+                    ),
+                    (
+                        "exchange".to_owned(),
+                        serde_json::Value::String("SH".to_owned()),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        };
+
+        let input = serde_json::json!({
+            "user_id": 42,
+            "exchange": "OVERRIDE"
+        });
+
+        let output = reader.apply_field_mappings(&input);
+        assert_eq!(output["id"], 42);
+        assert_eq!(output["code"], "603801");
+        // Existing payload fields take precedence over injected split params.
+        assert_eq!(output["exchange"], "OVERRIDE");
     }
 
     #[tokio::test]
@@ -699,6 +771,50 @@ mod tests {
         server.abort();
     }
 
+    #[tokio::test]
+    async fn test_fetch_single_page_null_data_path_returns_empty() {
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+
+        let server = tokio::spawn(async move {
+            use tokio::io::AsyncWriteExt;
+            let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
+                .await
+                .unwrap();
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let _ = tokio::io::AsyncReadExt::read(&mut socket, &mut buf).await;
+            let body = r#"{"data":{"items":null}}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket.write_all(response.as_bytes()).await.unwrap();
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let client = reqwest::Client::new();
+        let url = format!("http://127.0.0.1:{}/nested_null", port);
+        let (_body_json, items) = FetcherSplitReader::fetch_single_page(
+            &client,
+            &url,
+            "GET",
+            &BTreeMap::new(),
+            None,
+            Some("/data/items"),
+        )
+        .await
+        .unwrap();
+
+        assert!(items.is_empty());
+        server.abort();
+    }
+
     #[test]
     fn test_build_paginated_url_offset() {
         let props = FetcherProperties {
@@ -718,6 +834,7 @@ mod tests {
             pagination_cursor_param: "cursor".into(),
             params_sql: None,
             params_connection: None,
+            include_params: false,
             max_poll_count: None,
             concurrency: None,
         };
@@ -731,6 +848,7 @@ mod tests {
             rendered_url: String::new(),
             rendered_body: None,
             resolved_headers: BTreeMap::new(),
+            split_template_params: None,
         };
 
         let url = reader
@@ -766,6 +884,7 @@ mod tests {
             pagination_cursor_param: "cursor".into(),
             params_sql: None,
             params_connection: None,
+            include_params: false,
             max_poll_count: None,
             concurrency: None,
         };
@@ -779,6 +898,7 @@ mod tests {
             rendered_url: String::new(),
             rendered_body: None,
             resolved_headers: BTreeMap::new(),
+            split_template_params: None,
         };
 
         // First page: no cursor.
