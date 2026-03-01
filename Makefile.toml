@@ -180,7 +180,7 @@ alias = "logs"
 
 [tasks.logs]
 category = "RiseDev - Start/Stop"
-description = "Open logs with VSCode"
+description = "Open logs with VSCode or stream playground logs"
 script = '''
 #!/usr/bin/env bash
 
@@ -188,6 +188,18 @@ code "${PREFIX_LOG}" 2> /dev/null
 if [[ $? -eq 0 ]]; then
   exit 0
 fi
+
+if ${TMUX} has-session -t risedev 2>/dev/null \
+  && ${TMUX} list-windows -t risedev -F "#{window_name}" | grep -Fxq "playground" \
+  && [[ -f "${PREFIX_LOG}/playground.log" ]]; then
+  echo "VSCode not found. Streaming playground logs. Press Ctrl+C to stop."
+  tail -f -n 100 "${PREFIX_LOG}/playground.log"
+  exit 0
+fi
+
+echo "VSCode not found. Logs are under ${PREFIX_LOG}."
+echo "Use ./risedev follow <log_file> to stream a specific file."
+ls "${PREFIX_LOG}" 2> /dev/null || true
 '''
 
 
@@ -774,7 +786,7 @@ for i in $(seq 1 60); do
     echo ""
     echo "$(tput setaf 2)RisingWave playground is running in the background.$(tput sgr0)"
     echo "  - Connect with: $(tput setaf 4)./risedev psql$(tput sgr0)"
-    echo "  - View logs:    $(tput setaf 4)${TMUX} a -t risedev$(tput sgr0)"
+    echo "  - View logs:    $(tput setaf 4)./risedev logs$(tput sgr0)"
     echo "  - Stop with:    $(tput setaf 4)./risedev k$(tput sgr0)"
     exit 0
   fi
