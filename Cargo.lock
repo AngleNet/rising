@@ -6449,7 +6449,6 @@ dependencies = [
  "rustls-native-certs 0.6.3",
  "tokio",
  "tokio-rustls 0.24.1",
- "webpki-roots 0.25.2",
 ]
 
 [[package]]
@@ -6462,6 +6461,7 @@ dependencies = [
  "http 1.4.0",
  "hyper 1.6.0",
  "hyper-util",
+ "log",
  "rustls 0.23.35",
  "rustls-native-certs 0.8.1",
  "rustls-pki-types",
@@ -6531,7 +6531,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -12418,7 +12418,7 @@ dependencies = [
  "fail",
  "futures",
  "hyper 0.14.27",
- "hyper-rustls 0.24.2",
+ "hyper-rustls 0.27.5",
  "itertools 0.14.0",
  "madsim",
  "madsim-aws-sdk-s3",
