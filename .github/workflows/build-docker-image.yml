@@ -78,7 +78,7 @@ jobs:
           echo "PUSH_DOCKERHUB=$PUSH_DOCKERHUB"
           echo "PUSH_DOCKERHUB=$PUSH_DOCKERHUB" >> $GITHUB_ENV
       - name: 'Trigger Docker build Workflow via Buildkite'
-        uses: buildkite/trigger-pipeline-action@v2.3.0
+        uses: buildkite/trigger-pipeline-action@v2.4.1
         with:
           buildkite_api_access_token: ${{ secrets.BUILDKITE_TOKEN }}
           pipeline: 'risingwavelabs/docker'
