@@ -65,7 +65,7 @@ jobs:
           echo "SKIP_DASHBOARD=${SKIP_DASHBOARD}"
           echo "SKIP_DASHBOARD=${SKIP_DASHBOARD}" >> $GITHUB_ENV
       - name: 'Trigger Nexmark Benchmark via Buildkite'
-        uses: buildkite/trigger-pipeline-action@v2.3.0
+        uses: buildkite/trigger-pipeline-action@v2.4.1
         with:
           buildkite_api_access_token: ${{ secrets.RISINGWAVE_TEST_BUILDKITE_TOKEN }}
           pipeline: 'risingwave-test/nexmark-benchmark'
