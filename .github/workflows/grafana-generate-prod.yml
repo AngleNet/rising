@@ -35,7 +35,7 @@ jobs:
           mkdir -p grafana/prod-dashboard
           cp grafana/risingwave-*-dashboard.json grafana/prod-dashboard/
       - name: Upload production Grafana dashboards
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: grafana-prod-dashboards
           path: grafana/prod-dashboard/*.json
