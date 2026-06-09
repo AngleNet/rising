@@ -2166,6 +2166,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "btoi"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b5ab9db53bcda568284df0fd39f6eac24ad6f7ba7ff1168b9e76eba6576b976"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6564,7 +6573,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.0",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -7565,15 +7574,6 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f8cc7106155f10bdf99a6f379688f543ad6596a415375b36a59a054ceda1198"
-dependencies = [
- "hashbrown 0.15.5",
-]
-
-[[package]]
-name = "lru"
 version = "0.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1dc47f592c06f33f8e3aea9591776ec7c9f9e4124778ff8a3c3b87159f7e593"
@@ -8173,9 +8173,9 @@ dependencies = [
 
 [[package]]
 name = "mysql_async"
-version = "0.36.1"
+version = "0.36.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "277ce2f2459b2af4cc6d0a0b7892381f80800832f57c533f03e2845f4ea331ea"
+checksum = "d1d9585dc9058886ff3a1f48a23024dd1d054264dee7c5ae0e4bd640c953bee5"
 dependencies = [
  "bytes",
  "crossbeam-queue",
@@ -8184,8 +8184,8 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "keyed_priority_queue",
- "lru 0.14.0",
- "mysql_common",
+ "lru",
+ "mysql_common 0.35.5",
  "native-tls",
  "pem",
  "percent-encoding",
@@ -8209,10 +8209,9 @@ checksum = "fbb9f371618ce723f095c61fbcdc36e8936956d2b62832f9c7648689b338e052"
 dependencies = [
  "base64 0.22.1",
  "bitflags 2.10.0",
- "btoi",
+ "btoi 0.4.3",
  "byteorder",
  "bytes",
- "chrono",
  "crc32fast",
  "flate2",
  "getrandom 0.3.1",
@@ -8221,6 +8220,33 @@ dependencies = [
  "num-traits",
  "regex",
  "rust_decimal",
+ "saturating",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "thiserror 2.0.17",
+ "uuid",
+]
+
+[[package]]
+name = "mysql_common"
+version = "0.37.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b42ced54aa8ac97226486337973f9bc3956e24f03a23e88a6e18f640959d6e2"
+dependencies = [
+ "base64 0.22.1",
+ "bitflags 2.10.0",
+ "btoi 0.5.0",
+ "byteorder",
+ "bytes",
+ "chrono",
+ "crc32fast",
+ "flate2",
+ "getrandom 0.3.1",
+ "num-bigint",
+ "num-traits",
+ "regex",
  "saturating",
  "serde",
  "serde_json",
@@ -11274,7 +11300,7 @@ dependencies = [
  "jni",
  "jsonbb",
  "linkme",
- "lru 0.16.3",
+ "lru",
  "madsim-tokio",
  "memcomparable",
  "more-asserts",
@@ -11653,7 +11679,7 @@ dependencies = [
  "moka",
  "mongodb",
  "mysql_async",
- "mysql_common",
+ "mysql_common 0.37.2",
  "nexmark",
  "num-bigint",
  "opendal 0.53.3",
@@ -11998,7 +12024,7 @@ dependencies = [
  "md-5",
  "memcomparable",
  "mysql_async",
- "mysql_common",
+ "mysql_common 0.37.2",
  "num-integer",
  "parking_lot 0.12.5",
  "parse-display",
@@ -12506,7 +12532,7 @@ dependencies = [
  "either",
  "futures",
  "http 1.4.0",
- "lru 0.16.3",
+ "lru",
  "madsim-tokio",
  "madsim-tonic",
  "moka",
@@ -16974,19 +17000,6 @@ dependencies = [
  "windows-result 0.2.0",
  "windows-strings 0.1.0",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.61.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4763c1de310c86d75a878046489e2e5ba02c649d185f21c67d4cf8a56d098980"
-dependencies = [
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
- "windows-link 0.1.1",
- "windows-result 0.3.2",
- "windows-strings 0.4.0",
 ]
 
 [[package]]
