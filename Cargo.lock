@@ -419,7 +419,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "half 2.7.1",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "num",
 ]
 
@@ -5435,7 +5435,7 @@ dependencies = [
  "foyer-common",
  "foyer-intrusive-collections",
  "futures-util",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "itertools 0.14.0",
  "madsim-tokio",
  "mixtrics",
@@ -5466,7 +5466,7 @@ dependencies = [
  "fs4",
  "futures-core",
  "futures-util",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "io-uring",
  "itertools 0.14.0",
  "libc",
@@ -6097,7 +6097,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c7ed2f2edad8a14c8186b847909a41fbb9c3eafa44f88bd891114ed5019da09"
 dependencies = [
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "serde",
 ]
 
@@ -6140,9 +6140,20 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
+checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash 0.2.0",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -6764,7 +6775,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6717a8d2a5a929a1a2eb43a12812498ed141a0bcfb7e8f7844fbdbe4303bba9f"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "serde",
  "serde_core",
 ]
@@ -7578,7 +7589,7 @@ version = "0.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1dc47f592c06f33f8e3aea9591776ec7c9f9e4124778ff8a3c3b87159f7e593"
 dependencies = [
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
 ]
 
 [[package]]
@@ -9164,7 +9175,7 @@ dependencies = [
  "flate2",
  "futures",
  "half 2.7.1",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "lz4_flex",
  "num",
  "num-bigint",
@@ -11116,7 +11127,7 @@ dependencies = [
  "futures",
  "futures-async-stream",
  "futures-util",
- "hashbrown 0.16.0",
+ "hashbrown 0.17.1",
  "iceberg",
  "itertools 0.14.0",
  "linkme",
@@ -11262,7 +11273,7 @@ dependencies = [
  "futures",
  "hashbrown 0.14.5",
  "hashbrown 0.15.5",
- "hashbrown 0.16.0",
+ "hashbrown 0.17.1",
  "hex",
  "http 1.4.0",
  "http-body 0.4.5",
