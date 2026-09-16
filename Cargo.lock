@@ -15294,9 +15294,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-metrics"
-version = "0.4.0"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb2bb07a8451c4c6fa8b3497ad198510d8b8dffa5df5cfb97a64102a58b113c8"
+checksum = "01f967a7d11cf59ebeb361546fcc207763de7a885db18176e7042dfc28665f1c"
 dependencies = [
  "futures-util",
  "pin-project-lite",
